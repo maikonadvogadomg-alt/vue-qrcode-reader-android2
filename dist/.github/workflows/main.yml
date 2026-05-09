@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      # fix corepack issue: https://github.com/nodejs/corepack/issues/627
+      - name: Use Latest Corepack
+        run: |
+          echo "Before: corepack version => $(corepack --version || echo 'not installed')"
+          npm install -g corepack@latest
+          echo "After : corepack version => $(corepack --version)"
+          corepack enable
+          pnpm --version
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 18
+          cache: pnpm
+      - name: Install & Build
+        env: 
+          VITEPRESS_BASE: /vue-qrcode-reader/
+        run: |
+          pnpm install
+          pnpm run type-check
+          pnpm run build
+          pnpm run docs:build
+      - name: Deploy Docs
+        uses: JamesIves/github-pages-deploy-action@4.1.4
+        with:
+          branch: gh-pages
+          folder: docs/.vitepress/dist
+          clean-exclude: pr-preview
+          force: false
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
